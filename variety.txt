@@ -1,0 +1,2 @@
+{{ 'space_sr_title_pulled_back_from' | trans ({ '[symbol]': symbol, '[number]': '63600.00' | nf}) | raw }}
+{{ 'space_sr_title_retested_support_resistance_level' | trans ({'[symbol]': symbol,'[support_resistance]': 'space_level_resistance' | trans, '[number]': '63600.00' | nf}) | raw }}

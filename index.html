@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Command + V Event Listener</title>
+</head>
+<body>
+    <h1>Нажмите Command + V для вставки данных из буфера обмена</h1>
+    <script>
+        document.addEventListener('paste', async function(event) {
+            const clipboardData = event.clipboardData || window.clipboardData;
+            const items = clipboardData.items;
+
+            for (const item of items) {
+                if (item.kind === 'file') {
+                    const file = item.getAsFile();
+                    saveFile(file, file.name);
+                } else if (item.type === 'text/plain') {
+                    const text = await getText(item);
+                    const blob = new Blob([text], { type: 'text/plain' });
+                    saveFile(blob, 'pasted_text-1.txt');
+                } else if (item.type === 'text/html') {
+                    const html = await getText(item);
+                    const blob = new Blob([html], { type: 'text/html' });
+                    saveFile(blob, 'pasted_text.txt');
+                }
+            }
+        });
+
+        function getText(item) {
+            return new Promise(resolve => {
+                item.getAsString(resolve);
+            });
+        }
+
+        function saveFile(blob, filename) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
