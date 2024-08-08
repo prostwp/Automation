@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: automation-server
+    ports:
+      - "5001:5000"
+    volumes:
+      - /Users/dkarnachev/PycharmProjects/Automation/server:/usr/src/app
+    environment:
+      - SOCKET_PATH=/tmp/downloads_socket
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile1
+    container_name: automation-client
+    ports:
+      - "9223:9222"
+    volumes:
+      - /Users/dkarnachev/Downloads:/usr/app/src/Downloads
+    environment:
+      - SOCKET_PATH=/tmp/downloads_socket
+    depends_on:
+      - server

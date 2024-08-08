@@ -1,16 +1,16 @@
 import base64
 import json
-import os
 import general
+from ErrorHandler import raise_error
+
 
 class Decoder:
-    def __init__(self,content):
+    def __init__(self, content):
         self.content = content
 
-    def decoding(self, file_path):
+    def decoding(self):
         try:
-            general.ChartStateMethods.find_data_state_and_timeframe(self.content)
-            # Извлекаем Base64 строку изображения
+            general.find_data_state_and_timeframe(self.content)
             base64_str_index = self.content.find("base64,") + len("base64,")
             base64_str_end_index = self.content.find('"', base64_str_index)
             base64_image_str = self.content[base64_str_index:base64_str_end_index]
@@ -27,5 +27,4 @@ class Decoder:
             print("Файлы успешно декодированы и сохранены.")
             return json_data_state
         except Exception as e:
-            print(f"Ошибка при обработке файла: {e}")
-            os.remove(file_path)
+            raise_error(f"Ошибка при обработке файла: {e}")

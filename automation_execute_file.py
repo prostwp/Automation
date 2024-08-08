@@ -1,65 +1,91 @@
-from html_decoder import Decoder
 import os
 import platform
-from ErrorHandler import ErrorHandler
-from chart_execute import chart_exe
-from supres_execute import supres_exe
-from candle_execute import candle_exe
+import requests
+from html_decoder import Decoder
+import ErrorHandler
+from supres_execute import sup_res_exe
 import general
-from pynput.keyboard import Controller
-from pathlib import Path
 
 
-# os_name = platform.system()
-# if os_name == "Windows":
-#     file_path = 'C:\\Users\\dkarnachev\\Downloads\\pasted_text.txt'
-# else:
-#     file_path = '/Users/dkarnachev/Downloads/pasted_text.txt'
+def get_os_name():
+    return platform.system()
+
+
 def get_download_path():
-    if os.name == 'nt':  # Для Windows
-        download_path = os.path.join(os.environ['USERPROFILE'], 'Downloads')
+    if os.name == 'nt':
+        return os.path.join(os.environ['USERPROFILE'], 'Downloads')
     else:
-        download_path = os.path.join(os.path.expanduser('~'), 'Downloads')
-    return download_path
+        return os.path.join(os.path.expanduser('~'), 'Downloads')
 
 
-downloads_path = get_download_path()
-file_path = os.path.join(downloads_path, 'pasted_text.txt')
+def is_debugging_enabled(port=9222):
+    url = f"http://localhost:{port}/json"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            print("Chrome is running with debugging enabled on port", port)
+            return True
+        else:
+            print("Chrome is not running on port", port)
+            return False
+    except requests.ConnectionError:
+        print("No connection could be made to port", port)
+        return False
 
-amount_of_horizontal_line = 0
-keyboard = Controller()
 
-while True:
-    if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-        with open(file_path, 'r') as file:
-            content = file.read()
-            decoded_cp_post = Decoder(content)
-            list_tf_datastate = general.ChartStateMethods.find_data_state_and_timeframe(content)
-        try:
-            decoded_json = decoded_cp_post.decoding(file_path)
-            drawing_data = decoded_json['panels'][0]['drawings']
+class FileManager:
+    def __init__(self, path):
+        self.path = path
 
-            for drawing in drawing_data:
-                if drawing['toolType'] == 'text':
-                    split_draw_el = drawing['settings']['text'].split()
-                    if split_draw_el[0] in ("Three", "Engulfing", "Hammer", "Evening", "Morning", "Marubozu", "Doji"):
-                        candle_exe(drawing_data, list_tf_datastate[0], list_tf_datastate[1], keyboard)
-                        break
-                    elif split_draw_el[0] in ("Pennant", "Wedge", "Flag", "Double", "Head", "Rectangle", "Triangle"):
-                        chart_exe(drawing_data, list_tf_datastate[0], list_tf_datastate[1], keyboard)
-                        break
-                    elif split_draw_el[0] in ("Three", "Engulfing", "Hammer", "Evening", "Morning", "Marubozu", "Doji"):
-                        candle_exe(drawing_data, list_tf_datastate[0], list_tf_datastate[1], keyboard)
-                        break
-                    elif split_draw_el[0] in ("Ascending", "Descending"):
-                        print("Canal")
-                        break
-                elif drawing['toolType'] == 'horizontal_line':
-                    amount_of_horizontal_line += 1
-                    if amount_of_horizontal_line > 1:
-                        supres_exe(drawing_data, list_tf_datastate[1], keyboard)
-                        print("SupRes")
-                        break
-        except Exception:
-            ErrorHandler.raise_error("Невозможно декодировать файл")
-        os.remove(file_path)
+    def file_exists(self):
+        return os.path.exists(self.path) and os.path.getsize(self.path) > 0
+
+    def read_file(self):
+        with open(self.path, 'r') as file:
+            return file.read()
+
+    def delete_file(self):
+        os.remove(self.path)
+
+
+class DrawingProcessor:
+    def __init__(self):
+        self.amount_of_horizontal_line = 0
+
+    def process_drawings(self, drawings, list_tf_datastate):
+        for drawing in drawings:
+            if drawing['toolType'] == 'horizontal_line':
+                self.amount_of_horizontal_line += 1
+                if self.amount_of_horizontal_line > 1:
+                    sup_res_exe(drawings, list_tf_datastate[1])
+                    break
+
+
+class MainProcess:
+    def __init__(self):
+        self.os_name = get_os_name()
+        self.download_path = get_download_path()
+        self.file_path = os.path.join(self.download_path, 'pasted_text.txt')
+
+    def run(self):
+        if not is_debugging_enabled():
+            ErrorHandler.raise_error("нет отладки")
+        while True:
+            file_manager = FileManager(self.file_path)
+            if file_manager.file_exists():
+                content = file_manager.read_file()
+                decoded_cp_post = Decoder(content)
+                list_tf_datastate = general.find_data_state_and_timeframe(content)
+                try:
+                    decoded_json = decoded_cp_post.decoding()
+                    drawing_data = decoded_json['panels'][0]['drawings']
+                    processor = DrawingProcessor()
+                    processor.process_drawings(drawing_data, list_tf_datastate)
+                except Exception:
+                    ErrorHandler.raise_error("Невозможно декодировать файл")
+                file_manager.delete_file()
+
+
+if __name__ == "__main__":
+    main_process = MainProcess()
+    main_process.run()

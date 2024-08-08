@@ -25,32 +25,49 @@ try {
     // Получаем аргументы командной строки
     const args = process.argv.slice(2);
 
-    direction = args[0];
-    timeframe = args[1];
-    dataState = args[2];
-    pattern = args[3];
+    const direction = args[0];
+    const timeframe = args[1];
+    const dataState = args[2];
+    const pattern = args[3];
 
     (async () => {
         try {
+            logger.info('Начало асинхронной функции');
+
             // Чтение валютной пары из файла (здесь можно использовать dataState вместо чтения из файла)
             const currencyPair = dataState;
+            logger.info(`Валютная пара: ${currencyPair}`);
+
             let titleText;
-
-
             if (pattern === "Triangle") {
                 titleText = "{{ 'space_figures_title_formed_pattern' | trans ({ '[symbol]': symbol, '[pattern]': 'Triangle' }) | raw }}";
-            }
-            else { // Создание строки для вставки в поле #title
-            titleText = direction === 'buy' ?
-                `{{ 'space_patterns_title_formed_bullish_pattern' | trans ({ '[symbol]': symbol, '[pattern]': '${pattern}' }) | raw }}` :
-                `{{ 'space_patterns_title_formed_bearish_pattern' | trans ({ '[symbol]': symbol, '[pattern]': '${pattern}' }) | raw }}`;
+            } else {
+                titleText = direction === 'buy' ?
+                    `{{ 'space_patterns_title_formed_bullish_pattern' | trans ({ '[symbol]': symbol, '[pattern]': '${pattern}' }) | raw }}` :
+                    `{{ 'space_patterns_title_formed_bearish_pattern' | trans ({ '[symbol]': symbol, '[pattern]': '${pattern}' }) | raw }}`;
             }
 
-            console.log(titleText);
+            logger.info(`Сформирован текст title: ${titleText}`);
+
             const browserURL = 'http://127.0.0.1:9222';  // Порт для подключения к Chrome
-            const browser = await puppeteer.connect({ browserURL, defaultViewport: null });
+            logger.info(`Попытка подключения к браузеру по URL: ${browserURL}`);
+
+            let browser;
+            try {
+                const connectTimeout = 10000;  // Таймаут в миллисекундах (например, 10 секунд)
+                browser = await Promise.race([
+                    puppeteer.connect({ browserURL, defaultViewport: null }),
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Таймаут подключения к браузеру')), connectTimeout))
+                ]);
+                logger.info('Подключение к браузеру успешно');
+            } catch (err) {
+                logger.error(`Ошибка подключения к браузеру: ${err.message}`);
+                throw err;
+            }
+
             const targetUrl = 'https://cp.octafeed.com/panel/overview-posts/create';  // URL целевой страницы
             const pages = await browser.pages();
+            logger.info(`Количество открытых страниц: ${pages.length}`);
 
             // Найти последнюю вкладку с нужным URL
             let page = null;
@@ -68,7 +85,6 @@ try {
             }
 
             logger.info(`Используем страницу с URL: ${page.url()}`);
-            logger.info(`Всего открытых страниц: ${pages.length}`);
 
             // Ожидание загрузки элемента ввода title
             await page.waitForSelector('#title');
@@ -133,6 +149,8 @@ try {
             // Вставка значения timeframe в элемент с id="dealsAttribution_timeframe"
             const timeframeInput = await page.$('#dealsAttribution_timeframe');
             await timeframeInput.click();
+            logger.info(`Клик по элементу dealsAttribution_timeframe`);
+
             let arrowDownPresses;
             switch (timeframe) {
                 case '1.0':
@@ -150,7 +168,12 @@ try {
                 case '60.0':
                     arrowDownPresses = 4;
                     break;
+                default:
+                    arrowDownPresses = 0;
+                    logger.warn(`Неправильный timeframe: ${timeframe}`);
+                    break;
             }
+
             for (let i = 0; i < arrowDownPresses; i++) {
                 await page.keyboard.press('ArrowDown');
                 await new Promise(resolve => setTimeout(resolve, 200)); // Пауза между нажатиями

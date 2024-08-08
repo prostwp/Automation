@@ -1,37 +1,15 @@
 import requests
-
-from general import ChartStateMethods, News, Writer
+from general import NewsChecker, Writer
 import general
-import os
 from sup_res_keys import keys
 import webbrowser
-import subprocess
-from pynput.keyboard import Controller, Key
+from datetime import datetime
+import ErrorHandler
+from sup_res_selenium import perform_action
 import pyautogui
-import platform
-from datetime import datetime, timedelta
-from ErrorHandler import ErrorHandler
-
-try:
-    import pyautogui
-except AssertionError:
-    pass
 import time
 
-os_name = platform.system()
-if os_name == "Windows":
-    file_path = 'C:\\Users\\dkarnachev\\Downloads\\pasted_text.txt'
-else:
-    file_path = '/Users/dkarnachev/Downloads/pasted_text.txt'
-keyboard = Controller()
-
-
-def max_in_non_empty_list(lst):
-    if lst:  # Проверяем, что список не пуст
-        return max(lst)
-    else:
-        raise ValueError("Список не должен быть пустым")
-
+writer = Writer()
 
 def sup_res_dict_generator(split_draw_el, dict_sup_res):
     if "Weekly" in split_draw_el:
@@ -65,7 +43,6 @@ def get_price_change_percentage(symbol, api_key):
 
     current_date = datetime.now().strftime('%Y-%m-%d')
 
-    # Получаем данные за текущий и предыдущий день
     try:
         today_data = data['Time Series FX (Daily)'][current_date]
         today_open = float(today_data['1. open'])
@@ -76,7 +53,7 @@ def get_price_change_percentage(symbol, api_key):
         return "Данные за текущий день еще недоступны."
 
 
-def wrire_sup(sup_res_dict):
+def write_sup(sup_res_dict):
     count_of_sup = len(sup_res_dict['Support'])
     descending_order = sorted(sup_res_dict['Support'], reverse=True)
     key = keys['support'][count_of_sup - 1]
@@ -85,7 +62,7 @@ def wrire_sup(sup_res_dict):
     return key
 
 
-def wrire_res(sup_res_dict):
+def write_res(sup_res_dict):
     count_of_sup = len(sup_res_dict['Resistance'])
     ascending_order = sorted(sup_res_dict['Resistance'])
     key = keys['resistance'][count_of_sup - 1]
@@ -94,29 +71,30 @@ def wrire_res(sup_res_dict):
     return key
 
 
-def write_trend(datastate, keyboard):
+def write_trend(datastate):
+    global writer
     try:
         price_change = get_price_change_percentage(datastate, "SP5UT4AK12FE7ZEQ")
         if float(price_change) > 0.1:
-            Writer.write(keys['trend'][0], keyboard)
+            writer.write(keys['trend'][0])
         elif float(price_change) < -0.1:
-            Writer.write(keys['trend'][1], keyboard)
+            writer.write(keys['trend'][1])
         else:
-            Writer.write(keys['trend'][2], keyboard)
+            writer.write(keys['trend'][2])
     except Exception:
-        Writer.write(keys['trend'][0], keyboard)
+        writer.write(keys['trend'][2])
 
 
-def write_support_resistance(direction, dict_sup_res, keyboard):
+def write_support_resistance(direction, dict_sup_res):
     if direction == "buy":
-        Writer.write(wrire_sup(dict_sup_res), keyboard) if len(dict_sup_res["Support"]) > 0 else time.sleep(0.1)
-        Writer.write(keys["if_pair_rebound"][0], keyboard)
-        Writer.write(wrire_res(dict_sup_res), keyboard) if len(dict_sup_res["Resistance"]) > 0 else time.sleep(0.1)
+        writer.write(write_sup(dict_sup_res) if len(dict_sup_res['Support']) > 0 else '')
+        writer.write(keys["if_pair_rebound"][0])
+        writer.write(write_res(dict_sup_res) if len(dict_sup_res['Resistance']) > 0 else '')
 
     elif direction == "sell":
-        Writer.write(wrire_sup(dict_sup_res), keyboard) if len(dict_sup_res["Support"]) > 0 else time.sleep(0.1)
-        Writer.write(wrire_res(dict_sup_res), keyboard) if len(dict_sup_res["Resistance"]) > 0 else time.sleep(0.1)
-        Writer.write(keys["if_pair_rebound"][1], keyboard)
+        writer.write(write_sup(dict_sup_res) if len(dict_sup_res['Support']) > 0 else '')
+        writer.write(write_res(dict_sup_res) if len(dict_sup_res['Resistance']) > 0 else '')
+        writer.write(keys["if_pair_rebound"][1])
 
 
 def processing_of_drawings(drawing_data, dict_sup_res):
@@ -127,7 +105,7 @@ def processing_of_drawings(drawing_data, dict_sup_res):
             sup_res_dict_generator(split_draw_el, dict_sup_res)
 
         elif drawing['toolType'] == 'arrow_line':
-            direction = general.ChartStateMethods.define_direction(drawing)
+            direction = general.define_direction(drawing)
     print(dict_sup_res)
     return direction
 
@@ -146,33 +124,43 @@ def generate_main_title(dict_sup_res, direction):
         ErrorHandler.raise_error("Невозможно определить тайтл")
     return title
 
+
 def generate_spare_title(dict_sup_res, direction):
     if len(dict_sup_res["Support"]) > 0 and len(dict_sup_res["Resistance"]) > 0:
         with open("variety.txt", "w") as file:
             if type(dict_sup_res["Broke"] is not None):
-                if dict_sup_res["Broke"] == "resistance":
+                if dict_sup_res["Broke"][0] == "resistance":
                     file.write(keys["broke"][1].replace("1999", dict_sup_res["Broke"][1]))
                     file.write("\n")
-                elif dict_sup_res["Broke"] == "support":
+                elif dict_sup_res["Broke"][0] == "support":
                     file.write(keys["broke"][0].replace("1999", dict_sup_res["Broke"][1]))
                     file.write("\n")
             if direction == "sell" and len(dict_sup_res["Support"]):
-                print(1)
-                file.write(keys["bearish_title"][0].replace("1999", min(dict_sup_res["Resistance"])))
-                file.write("\n")
-                file.write(keys["bearish_title"][1].replace("1999", min(dict_sup_res["Resistance"])))
+                file.write(keys["spare_title"][1].replace("1999", min(dict_sup_res["Resistance"])))
             elif direction == "buy":
-                print(2)
-                file.write(keys["bullish_title"][0].replace("1999", max(dict_sup_res["Support"])))
-                file.write("\n")
-                file.write(keys["bullish_title"][1].replace("1999", max(dict_sup_res["Support"])))
+                file.write(keys["spare_title"][1].replace("1999", max(dict_sup_res["Support"])))
+            file.write("\n")
+            file.write(keys["spare_title"][0].replace("1999", max(dict_sup_res["Support"])))
+            file.write("\n")
+            file.write(keys["spare_title"][2].replace("1999", min(dict_sup_res["Resistance"])))
 
-def supres_exe(drawing_data, datastate, keyboard):
-    dict_sup_res = {"Support": [], "Resistance": [], "Broke": None}
 
+def remove_comma(dict_sup_res):
+    for sup in range(len(dict_sup_res["Support"])):
+        if ',' in dict_sup_res["Support"][sup]:
+            dict_sup_res["Support"][sup] = dict_sup_res["Support"][sup].replace(',', '')
+    for sup in range(len(dict_sup_res["Resistance"])):
+        if ',' in dict_sup_res["Resistance"][sup]:
+            dict_sup_res["Resistance"][sup] = dict_sup_res["Resistance"][sup].replace(',', '')
+
+
+def sup_res_exe(drawing_data, datastate):
+    dict_sup_res = {"Support": [], "Resistance": [], "Broke": [None]}
     direction = processing_of_drawings(drawing_data, dict_sup_res)
     if direction is None:
         ErrorHandler.raise_error("Невозможно определить направление")
+
+    remove_comma(dict_sup_res)
 
     url = 'https://cp.octafeed.com/panel/overview-posts/create'
     webbrowser.open_new_tab(url)
@@ -180,128 +168,19 @@ def supres_exe(drawing_data, datastate, keyboard):
     time.sleep(5)
     pyautogui.press('enter')
 
-    Writer.write_bold(keys["general_outlook"][0], keyboard)
+    writer.write_bold(keys["general_outlook"][0])
 
-    write_trend(datastate, keyboard)
+    write_trend(datastate)
 
-    write_support_resistance(direction, dict_sup_res, keyboard)
+    write_support_resistance(direction, dict_sup_res, )
 
-    News.news_checker(keyboard)
+    checker = NewsChecker(writer)
+    checker.news_checker()
 
-    Writer.is_friday(keyboard)
+    writer.is_friday()
 
     title = generate_main_title(dict_sup_res, direction)
 
     generate_spare_title(dict_sup_res, direction)
 
-    subprocess.run(["node", "sup_res_puppeteer_script.js", f"{direction}", f"{title}", f"{datastate}"])
-
-# supres_exe()
-# print(generate_title({"Resistance": ["1000", "2000.00"], "Support": []}, 'sell'))
-
-# while True:
-#     if os.path.exists(file_path) and os.path.getsize(file_path) > 0:
-#
-#         gen = keys["general_outlook"][0]
-#         print(gen)
-#         key = keys
-#         # levels = SupResAutomation()
-#         decoded_json = levels.decoding(file_path)
-#         drawing_data = decoded_json['panels'][0]['drawings']
-#         for drawing in drawing_data:
-#             levels.sup_res_dict_generator(drawing)
-#         if decoded_json:
-#             url = 'https://cp.octafeed.com/panel/overview-posts/create'
-#
-#             webbrowser.open(url)
-#
-#             # handler = VKeyHandler()
-#             # handler.wait_for_v_key()
-#             time.sleep(5)
-#
-#             # toggle_bold()
-#
-#             pyautogui.press('enter')
-#             #
-#
-#             # toggle_bold()
-#             # write(key["general_outlook"][0])
-#             write_bold(key["general_outlook"][0])
-#             # time.sleep(0.2)
-#             # toggle_bold()
-#             # time.sleep(0.2)
-#             print(levels.data_state)
-#             # if levels.data_state != "BTCUSD" and levels.data_state != "XAUUSD" and levels.data_state != "USDCAD" and levels.data_state != "GBPJPY":
-#
-#             else:
-#                 write(key['trend'][0])
-#             # write(key['trend'][0])
-#             if levels.direction == "buy":
-#                 write(wrire_sup(levels.dict_sup_res)) if len(levels.dict_sup_res["Support"]) > 0 else time.sleep(0.1)
-#                 write(key["if_pair_rebound"][0])
-#                 write(wrire_res(levels.dict_sup_res)) if len(levels.dict_sup_res["Resistance"]) > 0 else time.sleep(0.1)
-#
-#             elif levels.direction == "sell":
-#                 write(wrire_sup(levels.dict_sup_res)) if len(levels.dict_sup_res["Support"]) > 0 else time.sleep(0.1)
-#                 write(wrire_res(levels.dict_sup_res)) if len(levels.dict_sup_res["Resistance"]) > 0 else time.sleep(0.1)
-#                 write(key["if_pair_rebound"][1])
-#
-#             with open("news.txt", "r") as content:
-#                 try:
-#                     with open(file_path, 'r') as file:
-#                         content = file.readlines()
-#                     if content and len(content) == 2:
-#                         file_time = datetime.strptime(content[1], '%H:%M').time()
-#                         current_time = datetime.now()
-#                         threshold_time = datetime.combine(current_time.date(), file_time)
-#                         time_difference = threshold_time - current_time
-#                         write_bold(key["fundamental_factors"][0])
-#                         # write(key["fundamental_factors"][0])
-#                         # toggle_bold()
-#                         if time_difference > timedelta(hours=1):
-#                             write(content[0])
-#                         elif timedelta(0) <= time_difference <= timedelta(hours=1):
-#                             write(content[0].replace("hour", "minute"))
-#                         else:
-#                             with open(file_path, 'w') as file:
-#                                 pass
-#                     else:
-#                         write(key["no_news"][0])
-#                 except FileNotFoundError:
-#                     print("File not found.")
-#             today = datetime.today()
-#             if today.weekday() == 4:
-#                 write(keys["friday"][0])
-#             time.sleep(2)
-#             print(f"{levels.direction}" == 'sell')
-#             with open("range.txt", "w") as file:
-#                 file.write(
-#                     max(levels.dict_sup_res["Support"]) if len(levels.dict_sup_res["Support"]) > 0 else time.sleep(0.1))
-#                 file.write("\n")
-#                 file.write(min(levels.dict_sup_res["Resistance"]) if len(
-#                     levels.dict_sup_res["Resistance"]) > 0 else time.sleep(0.1))
-#             with open("variety.txt", "w") as file:
-#                 if type(levels.broke_flag is list()):
-#                     if levels.broke_flag[0] == "resistance":
-#                         file.write(keys["broke"][1].replace("1999", levels.broke_flag[1]))
-#                         file.write("\n")
-#                     elif levels.broke_flag[0] == "support":
-#                         file.write(keys["broke"][0].replace("1999", levels.broke_flag[1]))
-#                         file.write("\n")
-#                 if levels.direction == "sell":
-#                     print(1)
-#                     file.write(keys["bearish_title"][0].replace("1999", min(levels.dict_sup_res["Resistance"])))
-#                     file.write("\n")
-#                     file.write(keys["bearish_title"][1].replace("1999", min(levels.dict_sup_res["Resistance"])))
-#                 elif levels.direction == "buy":
-#                     print(2)
-#                     file.write(keys["bullish_title"][0].replace("1999", max(levels.dict_sup_res["Support"]) if len(
-#                         levels.dict_sup_res["Support"]) > 0 else time.sleep(
-#                         0.1)))
-#                     file.write("\n")
-#                     file.write(keys["bullish_title"][1].replace("1999", max(levels.dict_sup_res["Support"])) if len(
-#                         levels.dict_sup_res["Support"]) > 0 else time.sleep(0.1))
-#             print(3)
-#             subprocess.run(["node", "chart_puppeteer_script.js", f"{levels.direction}"])
-#             print(4)
-#         os.remove(file_path)
+    perform_action(direction, title, datastate)

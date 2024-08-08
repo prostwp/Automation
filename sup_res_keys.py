@@ -31,14 +31,11 @@ keys = {
         "{{ 'space_factors_report_will_be_released_in_few_hours' | trans ({'[country]': 'space_country_usa' | trans, '[event]': 'space_event_jobless_claims' | trans }) | raw }}",
         "{{ 'space_factors_report_will_be_released_in_few_minutes' | trans ({'[country]': 'space_country_usa' | trans, '[event]': 'space_event_jobless_claims' | trans }) | raw }}"],
 
-    "bullish_title":
+    "spare_title":
         [
             "{{ 'space_sr_title_rebounded_from_support_level_of_number' | trans ({ '[symbol]': symbol, '[number]': '1999' | nf}) | raw }}",
-            "{{ 'space_sr_title_retested_support_resistance_level' | trans ({'[symbol]': symbol,'[support_resistance]': 'space_level_support' | trans, '[number]': '1999' | nf}) | raw }}"],
-
-    "bearish_title":
-        ["{{ 'space_sr_title_pulled_back_from' | trans ({ '[symbol]': symbol, '[number]': '1999' | nf}) | raw }}",
-         "{{ 'space_sr_title_retested_support_resistance_level' | trans ({'[symbol]': symbol,'[support_resistance]': 'space_level_resistance' | trans, '[number]': '1999' | nf}) | raw }}"],
+            "{{ 'space_sr_title_retested_support_resistance_level' | trans ({'[symbol]': symbol,'[support_resistance]': 'space_level_support' | trans, '[number]': '1999' | nf}) | raw }}",
+            "{{ 'space_sr_title_pulled_back_from' | trans ({ '[symbol]': symbol, '[number]': '1999' | nf}) | raw }}"],
 
     "broke":
         [

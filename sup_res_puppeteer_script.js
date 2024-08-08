@@ -8,12 +8,12 @@ const logger = winston.createLogger({
         winston.format.timestamp({
             format: 'YYYY-MM-DD HH:mm:ss'
         }),
-        winston.format.printf(({ timestamp, level, message }) => {
+        winston.format.printf(({timestamp, level, message}) => {
             return `${timestamp} [${level.toUpperCase()}]: ${message}`;
         })
     ),
     transports: [
-        new winston.transports.File({ filename: 'log.txt' })
+        new winston.transports.File({filename: 'log.txt'})
     ]
 });
 
@@ -34,7 +34,7 @@ if (args.length === 3 && (args[0] === 'buy' || args[0] === 'sell')) {
 (async () => {
     try {
         const browserURL = 'http://127.0.0.1:9222';  // Порт для подключения к Chrome
-        const browser = await puppeteer.connect({ browserURL, defaultViewport: null });
+        const browser = await puppeteer.connect({browserURL, defaultViewport: null});
         const targetUrl = 'https://cp.octafeed.com/panel/overview-posts/create';  // URL целевой страницы
         const pages = await browser.pages();
 
@@ -84,7 +84,11 @@ if (args.length === 3 && (args[0] === 'buy' || args[0] === 'sell')) {
         logger.info('Элемент ввода educationPost найден');
 
         // Вставка текста "support" в элемент с id="educationPost" и нажатие Enter
-        await page.type('#educationPost', "support");
+        if (titleText.includes('broke')) {
+            await page.type('#educationPost', 'breakout');
+        } else {
+            await page.type('#educationPost', 'support');
+        }
         await page.keyboard.press('Enter');
         logger.info('Введен текст "support" и нажата клавиша Enter в поле educationPost');
 

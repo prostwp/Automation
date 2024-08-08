@@ -1,0 +1,40 @@
+FROM python:3.12-slim
+
+# Устанавливаем рабочую директорию
+WORKDIR /usr/app/src
+
+# Устанавливаем необходимые пакеты
+RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
+    libevdev-dev \
+    xvfb \
+    python3-tk \
+    python3-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Устанавливаем Node.js и npm
+RUN curl -fsSL https://deb.nodesource.com/setup_16.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Копируем файлы с зависимостями
+COPY requirements.txt ./
+COPY package.json ./
+COPY package-lock.json ./
+
+# Устанавливаем зависимости для Python
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Устанавливаем зависимости для Node.js
+RUN npm install
+
+# Копируем остальные файлы проекта
+COPY . .
+
+# Указываем, что /usr/app/src/Downloads будет монтируемым каталогом
+VOLUME /usr/app/src/Downloads
+
+# Запуск виртуального X-сервера и выполнение скрипта
+CMD xvfb-run --auto-servernum --server-args='-screen 0 1024x768x24' python automation_execute_file.py
